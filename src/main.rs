@@ -18,6 +18,7 @@ fn main() {
         .add_system(asteroid_movement)
         .add_system(update_asteroid_direction)
         .add_system(confine_asteroid_movement)
+        .add_system(asteroid_hit_player)
         .run();
     
 }
@@ -74,7 +75,7 @@ pub fn spawn_meteor(
     // Define possible meteor textures
     let metor_textures = [
         "images/meteorGrey_big4.png",
-        "images/meteorGrey_small2.png"
+        "images/meteorGrey_big3.png",
     ];
 
     for _ in 0..NUMBER_OF_ENEMIES {
@@ -248,5 +249,29 @@ pub fn confine_asteroid_movement(
         }
 
         transform.translation = translation;
+    }
+}
+
+pub fn asteroid_hit_player(
+    mut commands: Commands, 
+    mut player_query: Query<(Entity, &Transform), With<Player>>,
+    enemy_query: Query<&Transform, With<Asteroid>>,
+    audio: Res<Audio>, 
+    asset_server: Res<AssetServer>
+) {
+    if let Ok((player_entity, player_transform)) = player_query.get_single_mut() {
+        for enemy_transform in enemy_query.iter() {
+            let distance = player_transform
+                .translation
+                .distance(enemy_transform.translation);
+            let player_radius = PLAYER_SIZE / 2.0;
+            let asteroid_radius = ASTEROID_SIZE / 2.0;
+            if distance < player_radius + asteroid_radius {
+                println!("Asteroid hit player! Game Over!");
+                let sound_effect = asset_server.load("audio/explosionCrunch_000.ogg");
+                audio.play(sound_effect);
+                commands.entity(player_entity).despawn();
+            }
+        }
     }
 }
