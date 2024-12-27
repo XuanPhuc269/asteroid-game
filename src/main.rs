@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{app::AppExit, ecs::event, prelude::*, window::PrimaryWindow};
 use rand::prelude::*;
 
 pub const PLAYER_SIZE: f32 = 64.0; // Player's plane size
@@ -6,6 +6,7 @@ pub const PLAYER_SPEED: f32 = 500.0;
 pub const NUMBER_OF_ENEMIES: usize = 4;
 pub const ASTEROID_SPEED: f32 = 200.0;
 pub const ASTEROID_SIZE: f32 = 64.0; // Asteroid's size
+pub const ASTEROID_SPAWN_TIME: f32 = 5.0;
 pub const NUMBER_OF_STAR: usize = 10;
 pub const STAR_SIZE: f32 = 30.0; // Star's size
 pub const STAR_SPAWN_TIME: f32 = 1.0;
@@ -14,7 +15,10 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .init_resource::<Score>()
+        .init_resource::<HighScores>()
         .init_resource::<StarSpawnTimer>()
+        .init_resource::<AsteroidSpawnTimer>()
+        .add_event::<GameOver>()
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_player)
         .add_startup_system(spawn_meteor)
@@ -29,6 +33,12 @@ fn main() {
         .add_system(update_score)
         .add_system(tick_star_spawn_timer)
         .add_system(spawn_stars_over_time)
+        .add_system(tick_asteroid_spawn_timer)
+        .add_system(spawn_asteroid_over_time)
+        .add_system(exit_game)
+        .add_system(handle_game_over)
+        .add_system(update_high_scores)
+        .add_system(high_score_updated)
         .run();
 }
 
@@ -54,6 +64,17 @@ impl Default for Score {
     }
 }
 
+#[derive(Resource, Debug)]
+pub struct HighScores {
+    pub scores: Vec<(String, u32)>,
+}
+
+impl Default for HighScores {
+    fn default() -> Self {
+        HighScores { scores: Vec::new() }
+    }
+}
+
 #[derive(Resource)]
 pub struct StarSpawnTimer {
     pub timer: Timer,
@@ -65,6 +86,23 @@ impl Default for StarSpawnTimer {
             timer: Timer::from_seconds(STAR_SPAWN_TIME, TimerMode::Repeating),
         }
     }
+}
+
+#[derive(Resource)]
+pub struct AsteroidSpawnTimer {
+    pub timer: Timer,
+}
+
+impl Default for AsteroidSpawnTimer {
+    fn default() -> Self {
+        AsteroidSpawnTimer {
+            timer: Timer::from_seconds(ASTEROID_SPAWN_TIME, TimerMode::Repeating),
+        }
+    }
+}
+
+pub struct GameOver {
+    pub score: u32,
 }
 
 pub fn spawn_player(
@@ -295,10 +333,12 @@ pub fn confine_asteroid_movement(
 
 pub fn asteroid_hit_player(
     mut commands: Commands,
+    mut game_over_event_writer: EventWriter<GameOver>,
     mut player_query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<&Transform, With<Asteroid>>,
     audio: Res<Audio>,
     asset_server: Res<AssetServer>,
+    score: Res<Score>,
 ) {
     if let Ok((player_entity, player_transform)) = player_query.get_single_mut() {
         for enemy_transform in enemy_query.iter() {
@@ -312,6 +352,7 @@ pub fn asteroid_hit_player(
                 let sound_effect = asset_server.load("audio/explosionCrunch_000.ogg");
                 audio.play(sound_effect);
                 commands.entity(player_entity).despawn();
+                game_over_event_writer.send(GameOver { score: score.value });
             }
         }
     }
@@ -352,6 +393,13 @@ pub fn tick_star_spawn_timer(mut star_spawn_timer: ResMut<StarSpawnTimer>, time:
     star_spawn_timer.timer.tick(time.delta());
 }
 
+pub fn tick_asteroid_spawn_timer(
+    mut asteroid_spawn_timer: ResMut<AsteroidSpawnTimer>,
+    time: Res<Time>,
+) {
+    asteroid_spawn_timer.timer.tick(time.delta());
+}
+
 pub fn spawn_stars_over_time(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
@@ -371,5 +419,66 @@ pub fn spawn_stars_over_time(
             },
             Star {},
         ));
+    }
+}
+
+pub fn spawn_asteroid_over_time(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+    asteroid_spawn_timer: ResMut<AsteroidSpawnTimer>,
+) {
+    if asteroid_spawn_timer.timer.finished() {
+        let window = window_query.get_single().unwrap();
+
+        // Define possible meteor textures
+        let metor_textures = ["images/meteorGrey_big4.png", "images/meteorGrey_big3.png"];
+
+        let random_x = random::<f32>() * window.width();
+        let random_y = random::<f32>() * window.height();
+
+        // Randomly select a meteor texture
+        let selected_texture = metor_textures[random::<usize>() % metor_textures.len()];
+
+        commands.spawn((
+            SpriteBundle {
+                transform: Transform::from_xyz(random_x, random_y, 0.0),
+                texture: asset_server.load(selected_texture),
+                ..default()
+            },
+            Asteroid {
+                direction: Vec2::new(random::<f32>(), random::<f32>()).normalize(),
+            },
+        ));
+    }
+}
+
+pub fn exit_game(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut app_exit_event_writer: EventWriter<AppExit>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        app_exit_event_writer.send(AppExit);
+    }
+}
+
+pub fn handle_game_over(mut game_over_event_reader: EventReader<GameOver>) {
+    for event in game_over_event_reader.iter() {
+        println!("Your final score is: {}", event.score.to_string());
+    }
+}
+
+pub fn update_high_scores(
+    mut game_over_event_reader: EventReader<GameOver>,
+    mut high_score: ResMut<HighScores>,
+) {
+    for event in game_over_event_reader.iter() {
+        high_score.scores.push(("Player".to_string(), event.score));
+    }
+}
+
+pub fn high_score_updated( high_scores: Res<HighScores>) {
+    if high_scores.is_changed() {
+        println!("High Scores: {:?}", high_scores);
     }
 }
