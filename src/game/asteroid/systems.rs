@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::prelude::*;
 
-use crate::asteroid::components::*;
-use crate::asteroid::resources::*;
+use crate::game::asteroid::components::*;
+use crate::game::asteroid::resources::*;
 use super::{NUMBER_OF_ENEMIES, ASTEROID_SIZE, ASTEROID_SPEED};
 
 pub fn spawn_meteor(
@@ -36,6 +36,14 @@ pub fn spawn_meteor(
     }
 }
 
+pub fn despawn_meteor(
+    mut commands: Commands,
+    enemy_query: Query<Entity, With<Asteroid>>
+) {
+    for enemy_entity in enemy_query.iter() {
+        commands.entity(enemy_entity).despawn();
+    }
+}
 pub fn asteroid_movement(mut enemy_query: Query<(&mut Transform, &Asteroid)>, time: Res<Time>) {
     for (mut transform, enemy) in enemy_query.iter_mut() {
         let direction = Vec3::new(enemy.direction.x, enemy.direction.y, 0.0);

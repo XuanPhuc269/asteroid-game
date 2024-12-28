@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::player::components::*;
-use crate::asteroid::components::*;
-use crate::score::resources::*;
-use crate::asteroid::ASTEROID_SIZE;
-use crate::star::components::Star;
-use crate::star::STAR_SIZE;
+use super::components::Player;
+
+use crate::game::asteroid::components::*;
+use crate::game::score::resources::*;
+use crate::game::asteroid::ASTEROID_SIZE;
+use crate::game::star::components::Star;
+use crate::game::star::STAR_SIZE;
 use crate::events::GameOver;
 
 pub const PLAYER_SIZE: f32 = 64.0; // Player's plane size
@@ -27,6 +28,15 @@ pub fn spawn_player(
         },
         Player {},
     ));
+}
+
+pub fn despawn_player(
+    mut commands: Commands,
+    player_query: Query<Entity, With<Player>>,
+) {
+    if let Ok(player_entity) = player_query.get_single() {
+        commands.entity(player_entity).despawn();
+    }
 }
 
 pub fn player_movement(
