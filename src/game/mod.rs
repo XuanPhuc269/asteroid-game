@@ -22,19 +22,23 @@ impl Plugin for GamePlugin {
         app.add_state::<SimulationState>()
             // Events
             .add_event::<GameOver>()
+            // On Enter Systems
+            .add_system(pause_simulation.in_schedule(OnEnter(AppState::Game)))
             // Plugins
             .add_plugin(AsteroidPlugin)
             .add_plugin(PlayerPlugin)
             .add_plugin(ScorePlugin)
             .add_plugin(StarPlugin)
             // Systems
-            .add_system(toggle_simulation.run_if(in_state(AppState::Game)));
+            .add_system(toggle_simulation.run_if(in_state(AppState::Game)))
+            // On Exit System
+            .add_system(resume_simulation.in_schedule(OnExit(AppState::Game)));
     }
 }
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum SimulationState {
-    Running,
     #[default]
+    Running,
     Paused,
 }
