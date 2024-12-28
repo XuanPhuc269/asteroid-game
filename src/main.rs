@@ -1,7 +1,7 @@
 pub mod events;
-mod systems;
 mod game;
 mod main_menu;
+mod systems;
 
 use game::GamePlugin;
 use main_menu::MainMenuPlugin;
