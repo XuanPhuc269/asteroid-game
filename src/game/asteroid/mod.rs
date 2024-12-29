@@ -11,7 +11,7 @@ use crate::AppState;
 
 use super::SimulationState;
 
-pub const NUMBER_OF_ENEMIES: usize = 4;
+pub const NUMBER_OF_ENEMIES: usize = 6;
 pub const ASTEROID_SPEED: f32 = 200.0;
 pub const ASTEROID_SIZE: f32 = 64.0; // Asteroid's size
 
